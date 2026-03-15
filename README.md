@@ -4,7 +4,7 @@
 
 [Tianhe Ren](https://rentainhe.github.io/), [Shuo Shen](https://github.com/ShuoShenDe)
 
-[[`SAM 2 Paper`](https://arxiv.org/abs/2408.00714)] [[`Grounding DINO Paper`](https://arxiv.org/abs/2303.05499)] [[`Grounding DINO 1.5 Paper`](https://arxiv.org/abs/2405.10300)] [[`DINO-X Paper`](https://arxiv.org/abs/2411.14347)] [[`BibTeX`](#citation)]
+[[`SAM 2 Paper`](https://arxiv.org/abs/2408.00714)] [[`Grounding DINO Paper`](https://arxiv.org/abs/2303.05499)] [[`Grounding DINO 1.5 Paper`](https://arxiv.org/abs/2405.10300)] [[`DINO-X Paper`](https://arxiv.org/abs/2411.14347)] [[`BibTeX`](#citation)] [[`中文文档`](./README_zh.md)]
 
 [![Video Name](./assets/grounded_sam_2_intro.jpg)](https://github.com/user-attachments/assets/f0fb0022-779a-49fb-8f46-3a18a8b4e893)
 
@@ -100,19 +100,65 @@ pip install --no-build-isolation -e grounding_dino
 ```
 
 ### Installation with docker
-Build the Docker image and Run the Docker container:
 
-```
+#### Option 1 – Interactive shell (quick start)
+
+Build the Docker image and run an interactive container:
+
+```bash
 cd Grounded-SAM-2
 make build-image
 make run
 ```
+
 After executing these commands, you will be inside the Docker environment. The working directory within the container is set to: `/home/appuser/Grounded-SAM-2`
 
 Once inside the Docker environment, you can start the demo by running:
-```
+```bash
 python grounded_sam2_tracking_demo.py
 ```
+
+#### Option 2 – Docker Compose (recommended for persistent / service use)
+
+Run the project as a background service with named volumes for checkpoints and outputs:
+
+```bash
+# Start the service in detached mode
+make run-detached
+# or: docker compose -f docker-compose.grounded_sam2.yaml up -d --build
+
+# Open an interactive shell in the running container
+make shell
+
+# Download model checkpoints inside the container
+make download-sam2-ckpts
+make download-gdino-ckpts
+
+# Stop the service
+make stop
+```
+
+You can customise behaviour via environment variables or a `.env` file (see [`docker-compose.grounded_sam2.yaml`](./docker-compose.grounded_sam2.yaml) for the full list).
+
+#### Integrating into an external Docker Compose project
+
+The `docker-compose.grounded_sam2.yaml` file exposes a shared Docker network (`grounded_sam2_network`) so that other Compose projects can communicate with the Grounded SAM 2 container.
+
+```yaml
+# your-project/docker-compose.yaml
+networks:
+  grounded_sam2_net:
+    name: grounded_sam2_network
+    external: true   # attach to the already-running network
+
+services:
+  my_service:
+    image: my_image
+    networks:
+      - grounded_sam2_net
+```
+
+See [`README_zh.md`](./README_zh.md) for Chinese documentation including detailed Docker Compose integration examples.
 
 ## Grounded SAM 2 Demos
 ### Grounded SAM 2 Image Demo (with Grounding DINO)
