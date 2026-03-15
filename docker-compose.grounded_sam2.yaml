@@ -1,0 +1,94 @@
+# docker-compose.grounded_sam2.yaml
+#
+# Standalone Grounded SAM 2 inference service.
+#
+# Usage (standalone):
+#   docker compose -f docker-compose.grounded_sam2.yaml up --build
+#
+# Usage (from an external docker-compose):
+#   Add the following to your docker-compose.yaml:
+#
+#     include:
+#       - path: /path/to/Grounded-SAM-2/docker-compose.grounded_sam2.yaml
+#
+#   Then reference the service in your compose file via the shared network:
+#     services:
+#       my_service:
+#         networks:
+#           - grounded_sam2_network
+#         environment:
+#           - GROUNDED_SAM2_HOST=grounded_sam2
+#
+# The container exposes a shared Docker network "grounded_sam2_network"
+# and named volumes for checkpoints and output data so that they can be
+# reused across container restarts.
+
+services:
+  grounded_sam2:
+    image: grounded_sam2:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Set USE_CUDA=1 if your host has an NVIDIA GPU with CUDA 12.1+
+        USE_CUDA: "${USE_CUDA:-0}"
+        # Adjust TORCH_ARCH to match your GPU's compute capability
+        # Common values: "7.0;7.5;8.0;8.6" (V100/T4/A100/RTX 30xx)
+        TORCH_ARCH: "${TORCH_ARCH:-7.0;7.5;8.0;8.6}"
+    container_name: grounded_sam2
+    restart: unless-stopped
+    # stdin_open / tty are not set here because this is a long-running service.
+    # Use `docker exec -it grounded_sam2 bash` (or `make shell`) to get an
+    # interactive shell inside the running container.
+    # Keep the container running in the background.
+    command: ["sleep", "infinity"]
+    # Mount host checkpoint directories so weights are not re-downloaded on
+    # every container rebuild.  Create these directories on the host before
+    # starting the stack, or let Docker manage them as named volumes (the
+    # named-volume variant is shown below).
+    volumes:
+      - sam2_checkpoints:/home/appuser/Grounded-SAM-2/checkpoints
+      - gdino_checkpoints:/home/appuser/Grounded-SAM-2/gdino_checkpoints
+      # Mount a host directory for input data and output results
+      - "${DATA_DIR:-./data}:/home/appuser/Grounded-SAM-2/data:rw"
+      - "${OUTPUT_DIR:-./outputs}:/home/appuser/Grounded-SAM-2/outputs:rw"
+      # Optional: mount HuggingFace model cache to avoid re-downloading
+      - hf_cache:/home/appuser/.cache/huggingface
+    environment:
+      # Set to "https://hf-mirror.com" if you have limited access to HuggingFace
+      - HF_ENDPOINT=${HF_ENDPOINT:-}
+      # Set your Grounding DINO 1.5 / DINO-X API token here (or via .env file)
+      - API_TOKEN_FOR_GD1_5=${API_TOKEN_FOR_GD1_5:-}
+    networks:
+      - grounded_sam2_network
+    # GPU support — comment out the deploy block if no GPU is available
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+
+# ---------------------------------------------------------------------------
+# Named volumes — Docker manages the storage location on the host.
+# You can also replace these with bind-mount paths if you prefer explicit
+# host paths (e.g. "./checkpoints:/home/appuser/Grounded-SAM-2/checkpoints").
+# ---------------------------------------------------------------------------
+volumes:
+  sam2_checkpoints:
+    name: grounded_sam2_checkpoints
+  gdino_checkpoints:
+    name: grounded_sam2_gdino_checkpoints
+  hf_cache:
+    name: grounded_sam2_hf_cache
+
+# ---------------------------------------------------------------------------
+# Shared network — external docker-compose files can join this network to
+# communicate with the grounded_sam2 container.
+# ---------------------------------------------------------------------------
+networks:
+  grounded_sam2_network:
+    name: grounded_sam2_network
+    driver: bridge

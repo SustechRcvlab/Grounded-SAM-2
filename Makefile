@@ -22,16 +22,44 @@ else
 	BUILD_MESSAGE := "CUDA $(NVCC_VERSION) is not supported"
 endif
 
+IMAGE_NAME := grounded_sam2
+IMAGE_TAG  := latest
 
 build-image:
 	@echo $(BUILD_MESSAGE)
 	docker build --build-arg USE_CUDA=$(USE_CUDA) \
 	--build-arg TORCH_ARCH=$(TORCH_CUDA_ARCH_LIST) \
-	-t grounded_sam2:1.0 .
+	-t $(IMAGE_NAME):$(IMAGE_TAG) .
+
 run:
 	docker run --gpus all -it --rm --net=host --privileged \
 	-v /tmp/.X11-unix:/tmp/.X11-unix \
 	-v "${PWD}":/home/appuser/Grounded-SAM-2 \
 	-e DISPLAY=$DISPLAY \
 	--name=gsa \
-	--ipc=host -it grounded_sam2:1.0
+	--ipc=host -it $(IMAGE_NAME):$(IMAGE_TAG)
+
+# Run in detached mode with named volumes for checkpoints/outputs
+run-detached:
+	docker compose -f docker-compose.grounded_sam2.yaml up -d
+
+# Stop the detached container
+stop:
+	docker compose -f docker-compose.grounded_sam2.yaml down
+
+# Build using the compose file (respects USE_CUDA / TORCH_ARCH env vars)
+build-compose:
+	USE_CUDA=$(USE_CUDA) TORCH_ARCH=$(TORCH_CUDA_ARCH_LIST) \
+	docker compose -f docker-compose.grounded_sam2.yaml build
+
+# Open an interactive shell inside the running container
+shell:
+	docker exec -it grounded_sam2 bash
+
+# Download SAM 2 checkpoints inside the running container
+download-sam2-ckpts:
+	docker exec grounded_sam2 bash -c "cd checkpoints && bash download_ckpts.sh"
+
+# Download Grounding DINO checkpoints inside the running container
+download-gdino-ckpts:
+	docker exec grounded_sam2 bash -c "cd gdino_checkpoints && bash download_ckpts.sh"
